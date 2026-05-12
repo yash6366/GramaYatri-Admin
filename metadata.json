@@ -1,0 +1,6 @@
+{
+  "name": "Grama-Yatri Admin",
+  "description": "Professional admin dashboard for bus tracking and community transit monitoring in rural areas.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": []
+}

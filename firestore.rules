@@ -1,0 +1,117 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. DEFAULT DENY
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HELPERS ---
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isValidId(id) { return id is string && id.size() <= 64 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function getUserData() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    
+    // Role Checks (using data stored in users collection)
+    function isAdmin() { 
+      return isSignedIn() && (getUserData().role == 'admin' || (request.auth.token.email == 'yashwanthnaidum2408@gmail.com' && request.auth.token.email_verified == true)); 
+    }
+    function isModerator() { 
+      return isSignedIn() && (getUserData().role == 'admin' || getUserData().role == 'moderator' || (request.auth.token.email == 'yashwanthnaidum2408@gmail.com' && request.auth.token.email_verified == true)); 
+    }
+    function isRouteManager() { 
+      return isSignedIn() && (getUserData().role == 'admin' || getUserData().role == 'route_manager' || (request.auth.token.email == 'yashwanthnaidum2408@gmail.com' && request.auth.token.email_verified == true)); 
+    }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+
+    // --- COLLECTION RULES ---
+
+    // USERS
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.uid == userId &&
+               data.email is string && data.email.size() <= 100 &&
+               data.name is string && data.name.size() <= 100 &&
+               data.role in ['user', 'moderator', 'route_manager', 'admin'] &&
+               data.credibilityScore is number &&
+               data.status in ['active', 'banned'];
+      }
+
+      // Read profiles: Admins can see all, users can see their own
+      allow get: if isModerator() || isOwner(userId);
+      allow list: if isModerator();
+      
+      // Create profile: Anyone can create their initial profile once
+      allow create: if isOwner(userId) && 
+                      isValidUser(incoming()) && 
+                      (incoming().role == 'user' || (incoming().role == 'admin' && incoming().email == 'yashwanthnaidum2408@gmail.com')); // Allow bootstrap admin
+
+      // Update profile
+      allow update: if (isOwner(userId) && 
+                        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'email']) &&
+                        isValidUser(incoming())) ||
+                     (isAdmin() && 
+                        isValidUser(incoming())); // Admins can update roles/status
+    }
+
+    // ROUTES
+    match /routes/{routeId} {
+      function isValidRoute(data) {
+        return data.id is string &&
+               data.name is string && data.name.size() <= 200 &&
+               data.origin is string &&
+               data.destination is string &&
+               data.status in ['active', 'inactive'];
+      }
+
+      allow read: if isSignedIn();
+      allow create, delete: if isRouteManager() && isValidRoute(incoming());
+      allow update: if isRouteManager() && 
+                      isValidRoute(incoming()) &&
+                      incoming().id == existing().id;
+    }
+
+    // BUS REPORTS
+    match /bus_reports/{reportId} {
+      function isValidReport(data) {
+        return data.userId == request.auth.uid &&
+               data.routeId is string &&
+               data.stopId is string &&
+               data.status in ['pending', 'approved', 'rejected', 'spam'] &&
+               data.timestamp == request.time;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isModerator(); // Admins/Moderators can see all reports for the dashboard
+      
+      allow create: if isVerified() && 
+                      isValidReport(incoming()) &&
+                      incoming().status == 'pending'; // Users can only create pending reports
+
+      allow update: if (isModerator() && 
+                        incoming().diff(existing()).affectedKeys().hasOnly(['status']) &&
+                        incoming().status in ['approved', 'rejected', 'spam']);
+    }
+
+    // LATEST REPORTS
+    match /latest_reports/{routeId} {
+      allow read: if isSignedIn();
+      allow write: if isModerator(); // Only moderators/admins update the official latest position
+    }
+    
+    // NOTIFICATIONS
+    match /notifications/{notiId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    
+    // ETA
+    match /eta/{etaId} {
+      allow read: if isSignedIn();
+      allow write: if isRouteManager();
+    }
+  }
+}

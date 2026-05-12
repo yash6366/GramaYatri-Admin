@@ -1,0 +1,111 @@
+{
+  "entities": {
+    "Route": {
+      "title": "Bus Route",
+      "description": "Definition of a bus route including stops and schedule metadata.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "origin": { "type": "string" },
+        "destination": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "estimatedDuration": { "type": "number" },
+        "stops": {
+          "type": "array",
+          "description": "List of stop objects with coordinates and sequence."
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "origin", "destination", "status"]
+    },
+    "BusReport": {
+      "title": "Bus Location Report",
+      "description": "User-submitted report about a bus location.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "routeId": { "type": "string" },
+        "stopId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "credibilityScore": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "spam"] },
+        "location": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        }
+      },
+      "required": ["userId", "routeId", "stopId", "timestamp", "status"]
+    },
+    "User": {
+      "title": "App User",
+      "description": "Profile of a mobile app user or administrator.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "moderator", "route_manager", "admin"] },
+        "credibilityScore": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "banned"] },
+        "reportCount": { "type": "number" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "ETA": {
+      "title": "Estimated Time of Arrival",
+      "description": "Generated ETA values for specific stops on a route.",
+      "type": "object",
+      "properties": {
+        "routeId": { "type": "string" },
+        "stopId": { "type": "string" },
+        "estimatedAt": { "type": "string", "format": "date-time" },
+        "confidence": { "type": "number" }
+      },
+      "required": ["routeId", "stopId", "estimatedAt"]
+    },
+    "Notification": {
+      "title": "System Notification",
+      "description": "Push alerts or announcements sent to users.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["announcement", "disruption", "emergency"] },
+        "scheduledFor": { "type": "string", "format": "date-time" },
+        "sentBy": { "type": "string" }
+      },
+      "required": ["title", "message", "type"]
+    }
+  },
+  "firestore": {
+    "routes": {
+      "schema": "Route",
+      "description": "Collection of bus routes."
+    },
+    "bus_reports": {
+      "schema": "BusReport",
+      "description": "Log of all location reports submitted by users."
+    },
+    "latest_reports": {
+      "schema": "BusReport",
+      "description": "The most recent verified report for each route."
+    },
+    "users": {
+      "schema": "User",
+      "description": "User profiles and permissions."
+    },
+    "eta": {
+      "schema": "ETA",
+      "description": "Real-time ETA computations."
+    },
+    "notifications": {
+      "schema": "Notification",
+      "description": "History of sent notifications."
+    }
+  }
+}
